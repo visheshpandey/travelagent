@@ -1,4 +1,4 @@
-import type { DashboardResponse, DisruptResponse, ItineraryResponse } from "./types";
+import type { DashboardResponse, DisruptResponse, ItineraryResponse, WeatherCheckResponse } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
@@ -56,4 +56,8 @@ export function askQuestion(payload: { trip_id: string; question: string }) {
 
 export function getDashboard(tripId: string) {
   return request<DashboardResponse>(`/dashboard?trip_id=${encodeURIComponent(tripId)}`);
+}
+
+export function checkWeather(tripId: string) {
+  return request<WeatherCheckResponse>(`/weather-check?trip_id=${encodeURIComponent(tripId)}`);
 }

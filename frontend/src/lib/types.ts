@@ -49,3 +49,19 @@ export interface ChatMessage {
   role: "user" | "agent";
   text: string;
 }
+
+export interface AtRiskItem {
+  item_id: string;
+  poi: string;
+  date: string;
+  category: string;
+}
+
+export interface WeatherCheckResponse {
+  destination: string;
+  condition: string;
+  description: string;
+  temp_c: number;
+  is_severe: boolean;
+  at_risk_items: AtRiskItem[];
+}

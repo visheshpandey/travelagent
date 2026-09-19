@@ -1,22 +1,59 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { disruptTrip } from "../../lib/api";
-import type { DayPlan } from "../../lib/types";
+import { checkWeather, disruptTrip } from "../../lib/api";
+import type { DayPlan, WeatherCheckResponse } from "../../lib/types";
 
 interface Props {
   tripId: string;
   days: DayPlan[];
   selectedItemId: string | null;
   explanation: string | null;
+  onSelectItem: (itemId: string) => void;
   onDisrupted: (days: DayPlan[], explanation: string) => void;
 }
 
-export default function DisruptPanel({ tripId, days, selectedItemId, explanation, onDisrupted }: Props) {
+const WEATHER_ICON: Record<string, string> = {
+  Thunderstorm: "⛈️",
+  Drizzle: "🌦️",
+  Rain: "🌧️",
+  Snow: "❄️",
+  Clear: "☀️",
+  Clouds: "☁️",
+};
+
+export default function DisruptPanel({
+  tripId,
+  days,
+  selectedItemId,
+  explanation,
+  onSelectItem,
+  onDisrupted,
+}: Props) {
   const [reason, setReason] = useState("closed");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [weather, setWeather] = useState<WeatherCheckResponse | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
 
   const selectedItem = days.flatMap((d) => d.items).find((i) => i.id === selectedItemId);
+
+  async function handleCheckWeather() {
+    setWeatherLoading(true);
+    setWeatherError(null);
+    try {
+      setWeather(await checkWeather(tripId));
+    } catch (err) {
+      setWeatherError(err instanceof Error ? err.message : "Weather check failed");
+    } finally {
+      setWeatherLoading(false);
+    }
+  }
+
+  function handlePickAtRiskItem(itemId: string, poi: string) {
+    onSelectItem(itemId);
+    setReason(`${weather?.description ?? "bad weather"} in ${weather?.destination} — ${poi} is outdoors`);
+  }
 
   async function handleDisrupt() {
     if (!selectedItemId) return;
@@ -34,6 +71,64 @@ export default function DisruptPanel({ tripId, days, selectedItemId, explanation
 
   return (
     <div className="max-w-6xl mx-auto px-6 sm:px-10 -mt-10 mb-24">
+      <div className="glass rounded-2xl p-6 shadow-card mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex-1">
+            <p className="text-xs uppercase tracking-wide text-white/50 mb-1">Live weather check</p>
+            {weather ? (
+              <p className="text-sm">
+                {WEATHER_ICON[weather.condition] ?? "🌡️"} {weather.destination} right now:{" "}
+                <span className="font-medium">{weather.description}</span>,{" "}
+                {Math.round(weather.temp_c)}°C
+                {weather.is_severe && (
+                  <span className="text-ember font-semibold"> — outdoor plans at risk</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-sm text-white/50">Check today's real conditions at the destination.</p>
+            )}
+          </div>
+          <button
+            onClick={handleCheckWeather}
+            disabled={weatherLoading}
+            className="rounded-full border border-white/15 px-5 py-2 text-sm text-white/80 hover:bg-white/5 transition disabled:opacity-40"
+          >
+            {weatherLoading ? "Checking…" : "Check live weather"}
+          </button>
+        </div>
+
+        {weatherError && <p className="text-sm text-red-400 mt-3">{weatherError}</p>}
+
+        {weather && weather.is_severe && weather.at_risk_items.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-xs text-white/50 mb-2">
+              These outdoor activities may be affected — tap one to select it for disruption:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {weather.at_risk_items.map((item) => (
+                <button
+                  key={item.item_id}
+                  onClick={() => handlePickAtRiskItem(item.item_id, item.poi)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium border transition ${
+                    selectedItemId === item.item_id
+                      ? "border-ember bg-ember/10 text-ember"
+                      : "border-white/10 text-white/70 hover:border-white/25"
+                  }`}
+                >
+                  {item.poi} · {item.date}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {weather && weather.is_severe && weather.at_risk_items.length === 0 && (
+          <p className="text-xs text-white/40 mt-3">
+            Conditions are severe, but no outdoor activities are currently scheduled.
+          </p>
+        )}
+      </div>
+
       <div className="glass rounded-2xl p-6 shadow-card flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex-1">
           <p className="text-xs uppercase tracking-wide text-white/50 mb-1">Simulate disruption</p>

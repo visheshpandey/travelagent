@@ -54,6 +54,7 @@ function App() {
             days={trip.days}
             selectedItemId={selectedItemId}
             explanation={explanation}
+            onSelectItem={setSelectedItemId}
             onDisrupted={handleDisrupted}
           />
           <DashboardSummary tripId={trip.trip_id} refreshKey={refreshKey} />
