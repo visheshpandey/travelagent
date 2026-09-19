@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import mock_data
+import opentripmap_client as mock_data
 import state
 from models import (
     AskRequest,
