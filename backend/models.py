@@ -84,3 +84,19 @@ class ConflictItem(BaseModel):
 
 class ConflictResponse(BaseModel):
     conflicts: list[ConflictItem]
+
+
+class AtRiskItem(BaseModel):
+    item_id: str
+    poi: str
+    date: str
+    category: str
+
+
+class WeatherCheckResponse(BaseModel):
+    destination: str
+    condition: str
+    description: str
+    temp_c: float
+    is_severe: bool
+    at_risk_items: list[AtRiskItem]

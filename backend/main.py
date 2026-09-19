@@ -17,12 +17,16 @@ from models import (
     GenerateItineraryRequest,
     ItineraryResponse,
     ModifyRequest,
+    WeatherCheckResponse,
 )
 from prompts.conflicts import check_conflicts
 from prompts.itinerary import generate_itinerary
 from prompts.qna import answer_question
 from prompts.replanner import replan
 from utils import estimate_travel_minutes
+from weather_client import get_current_weather
+
+WEATHER_SENSITIVE_CATEGORIES = {"nature", "heritage"}
 
 logger = logging.getLogger("travelpilot")
 
@@ -116,6 +120,39 @@ def check_conflicts_endpoint(trip_id: str):
 
     pois = mock_data.get_pois(trip["destination"])
     return check_conflicts(trip["itinerary"], pois)
+
+
+@app.get("/weather-check", response_model=WeatherCheckResponse)
+def weather_check_endpoint(trip_id: str):
+    """Checks TODAY's actual weather at the trip's destination (not a date-matched
+    forecast — see weather_client.py) and flags outdoor-leaning itinerary items as
+    at-risk when conditions are severe, so the user can trigger a real disruption."""
+    trip = state.get_trip(trip_id)
+    if trip is None:
+        raise HTTPException(status_code=404, detail=f"Unknown trip_id: {trip_id}")
+
+    weather = get_current_weather(trip["destination"])
+
+    at_risk_items = []
+    if weather["is_severe"]:
+        for day in trip["itinerary"].get("days", []):
+            for item in day.get("items", []):
+                if item["category"] in WEATHER_SENSITIVE_CATEGORIES:
+                    at_risk_items.append({
+                        "item_id": item["id"],
+                        "poi": item["poi"],
+                        "date": day["date"],
+                        "category": item["category"],
+                    })
+
+    return {
+        "destination": trip["destination"],
+        "condition": weather["main"],
+        "description": weather["description"],
+        "temp_c": weather["temp_c"],
+        "is_severe": weather["is_severe"],
+        "at_risk_items": at_risk_items,
+    }
 
 
 @app.get("/dashboard", response_model=DashboardResponse)
