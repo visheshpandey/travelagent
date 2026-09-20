@@ -86,6 +86,7 @@ export interface DashboardResponse {
   total_cost: number;
   backup_options: BackupOption[];
   accommodation?: Accommodation | null;
+  grand_total: number;
 }
 
 export interface ChatMessage {

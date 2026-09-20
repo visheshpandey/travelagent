@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { DESTINATIONS, INTERESTS } from "../../lib/destinations";
 import { generateItinerary, getPois } from "../../lib/api";
 import { useLaunchSequence, type ScreenPoint } from "../../lib/useLaunchSequence";
+import { getDestinationPhoto } from "../../lib/destinationPhoto";
 import LaunchOverlay from "../transition/LaunchOverlay";
 import type { ItineraryResponse, PoiSummary, TripConstraints } from "../../lib/types";
 
@@ -43,6 +44,21 @@ export default function ConstraintForm({ destination, onDestinationChange, onGen
   const [poisLoading, setPoisLoading] = useState(false);
   const [poisError, setPoisError] = useState<string | null>(null);
   const poiCache = useRef<Record<string, PoiSummary[]>>({});
+
+  const [destPhoto, setDestPhoto] = useState<string | null>(null);
+  const [destPhotoError, setDestPhotoError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDestPhoto(null);
+    setDestPhotoError(false);
+    getDestinationPhoto(destination).then((url) => {
+      if (!cancelled) setDestPhoto(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [destination]);
 
   useEffect(() => {
     setMustVisit([]);
@@ -136,9 +152,40 @@ export default function ConstraintForm({ destination, onDestinationChange, onGen
           className="glass rounded-3xl p-8 sm:p-10 shadow-card"
         >
           <h2 className="font-display text-2xl sm:text-3xl font-bold mb-1">Set your constraints</h2>
-          <p className="text-tertiary text-sm mb-8">
+          <p className="text-tertiary text-sm mb-6">
             Pick a destination — the agent handles hours, budget, and travel time.
           </p>
+
+          <div
+            className="relative rounded-2xl overflow-hidden mb-6 h-56"
+            style={{ background: "linear-gradient(160deg,#3a2440,#c97a4a)" }}
+          >
+            {destPhoto && !destPhotoError && (
+              <motion.img
+                key={destPhoto}
+                src={destPhoto}
+                alt={destination}
+                referrerPolicy="no-referrer"
+                onError={() => setDestPhotoError(true)}
+                initial={{ opacity: 0, scale: 1.05 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+            <div
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(180deg, rgba(20,10,14,0) 42%, rgba(20,10,14,0.8) 100%)" }}
+            />
+            <div className="absolute left-5 bottom-4">
+              <p className="text-[11px] tracking-[0.14em] uppercase mb-1" style={{ color: "#ffe7bf" }}>
+                Destination
+              </p>
+              <p className="font-display text-2xl font-semibold" style={{ color: "#fff8ee" }}>
+                {destination}
+              </p>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>

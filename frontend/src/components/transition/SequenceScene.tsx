@@ -164,7 +164,7 @@ export default function SequenceScene({ phase, origin, target }: Props) {
   return (
     <>
       <ambientLight intensity={0.8} />
-      <pointLight position={[0, 0, 60]} intensity={1.2} color="#ec4899" />
+      <pointLight position={[0, 0, 60]} intensity={1.2} color="#b1502c" />
 
       <group ref={headRef} visible={false}>
         <mesh>
@@ -172,7 +172,7 @@ export default function SequenceScene({ phase, origin, target }: Props) {
           <meshStandardMaterial
             ref={headMatRef}
             color="#0b0d16"
-            emissive="#ec4899"
+            emissive="#b1502c"
             emissiveIntensity={1.9}
             roughness={0.3}
             metalness={0.6}
@@ -180,7 +180,7 @@ export default function SequenceScene({ phase, origin, target }: Props) {
             opacity={1}
           />
         </mesh>
-        <Sparkles count={30} scale={40} size={3.5} speed={0.5} color="#f472b6" />
+        <Sparkles count={30} scale={40} size={3.5} speed={0.5} color="#e8a765" />
       </group>
 
       {trailRefs.map((r, i) => (
@@ -190,7 +190,7 @@ export default function SequenceScene({ phase, origin, target }: Props) {
             scale={16 - i * 3}
             size={2.2 - i * 0.4}
             speed={0.3}
-            color={i === 0 ? "#ec4899" : "#f9a8d4"}
+            color={i === 0 ? "#b1502c" : "#f3c78a"}
             opacity={0.7 - i * 0.18}
           />
         </group>
@@ -201,14 +201,14 @@ export default function SequenceScene({ phase, origin, target }: Props) {
           <sphereGeometry args={[10, 24, 24]} />
           <meshBasicMaterial
             ref={flashMatRef}
-            color="#ec4899"
+            color="#b1502c"
             transparent
             opacity={0.8}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
-        <Sparkles count={90} scale={140} size={3} speed={1.4} color="#f9a8d4" opacity={0.9} />
+        <Sparkles count={90} scale={140} size={3} speed={1.4} color="#f3c78a" opacity={0.9} />
       </group>
     </>
   );

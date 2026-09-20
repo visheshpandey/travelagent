@@ -72,14 +72,14 @@ export default function StopTimeline({ days, selectedItemId, onSelectItem }: Pro
                 <motion.circle
                   r={11}
                   fill="none"
-                  stroke="#ec4899"
+                  stroke="var(--color-accent2, #6b5b95)"
                   strokeOpacity={0.35}
                   strokeWidth={1.5}
                   animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
                   transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
                 />
               )}
-              <circle r={active ? 6.5 : 4} fill={active ? "#ec4899" : "var(--color-accent, #7dd3fc)"} />
+              <circle r={active ? 6.5 : 4} fill={active ? "var(--color-accent2, #6b5b95)" : "var(--color-accent, #7dd3fc)"} />
             </g>
           );
         })}
@@ -99,7 +99,7 @@ export default function StopTimeline({ days, selectedItemId, onSelectItem }: Pro
             >
               <p
                 className={`text-[9px] tracking-wide font-medium leading-tight ${
-                  active ? "text-[#ec4899]" : "text-faint"
+                  active ? "text-accent2" : "text-faint"
                 }`}
               >
                 DAY {stop.dayIndex + 1}

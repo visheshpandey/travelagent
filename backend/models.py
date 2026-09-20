@@ -127,6 +127,7 @@ class DashboardResponse(BaseModel):
     total_cost: float
     backup_options: list[BackupOption]
     accommodation: Optional[Accommodation] = None
+    grand_total: float
 
 
 class ConflictResponse(BaseModel):

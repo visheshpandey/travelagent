@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { getDashboard } from "../../lib/api";
+import { hashCity } from "../../lib/hash";
 import type { DashboardResponse } from "../../lib/types";
 import AccommodationCard from "./AccommodationCard";
+import TerrainBanner from "../scene/TerrainBanner";
 
 interface Props {
   tripId: string;
@@ -12,6 +14,7 @@ interface Props {
 export default function DashboardSummary({ tripId, refreshKey }: Props) {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const seed = useMemo(() => hashCity(tripId), [tripId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +39,14 @@ export default function DashboardSummary({ tripId, refreshKey }: Props) {
 
         {data && (
           <>
+          <TerrainBanner
+            seed={seed}
+            segments={data.day_breakdown.map((d) => ({
+              label: d.date,
+              value: d.accommodation_cost + d.travel_cost,
+            }))}
+          />
+
           <AccommodationCard accommodation={data.accommodation} />
 
           <div className="space-y-6 mb-6">
@@ -101,6 +112,39 @@ export default function DashboardSummary({ tripId, refreshKey }: Props) {
                 ))}
               </ul>
             )}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            className="glass rounded-2xl p-6 shadow-card mt-6"
+          >
+            <h3 className="font-display font-semibold mb-4">Total trip cost</h3>
+            <ul className="space-y-2 text-sm mb-4">
+              <li className="flex items-center justify-between">
+                <span className="text-secondary">Food &amp; activities</span>
+                <span className="text-primary">₹{data.total_cost.toLocaleString("en-IN")}</span>
+              </li>
+              <li className="flex items-center justify-between">
+                <span className="text-secondary">Stay</span>
+                <span className="text-primary">
+                  ₹{data.day_breakdown.reduce((sum, d) => sum + d.accommodation_cost, 0).toLocaleString("en-IN")}
+                </span>
+              </li>
+              <li className="flex items-center justify-between">
+                <span className="text-secondary">Travel</span>
+                <span className="text-primary">
+                  ₹{data.day_breakdown.reduce((sum, d) => sum + d.travel_cost, 0).toLocaleString("en-IN")}
+                </span>
+              </li>
+            </ul>
+            <div className="flex items-center justify-between pt-4 border-t border-subtle">
+              <span className="font-display font-semibold">Total</span>
+              <span className="font-display font-semibold text-accent text-lg">
+                ₹{data.grand_total.toLocaleString("en-IN")}
+              </span>
+            </div>
           </motion.div>
           </>
         )}

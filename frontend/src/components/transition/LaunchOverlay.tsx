@@ -58,7 +58,7 @@ export default function LaunchOverlay({ phase, origin, target }: Props) {
 
       <motion.div
         className="absolute inset-0"
-        style={{ background: "radial-gradient(circle at 50% 100%, #ec4899, transparent 75%)" }}
+        style={{ background: "radial-gradient(circle at 50% 100%, #b1502c, transparent 75%)" }}
         animate={{ opacity: FLASH_OPACITY[phase] }}
         transition={{ duration: phase === "burst" ? 0.2 : 0.3, ease: phase === "burst" ? "easeIn" : "easeOut" }}
       />

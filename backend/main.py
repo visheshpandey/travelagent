@@ -312,11 +312,17 @@ def dashboard_endpoint(trip_id: str):
         if p["name"] not in used_names and p["category"] in used_categories
     ][:5]
 
+    activities_cost = itinerary.get("total_cost", 0)
+    stay_cost = sum(d["accommodation_cost"] for d in day_breakdown)
+    travel_cost = sum(d["travel_cost"] for d in day_breakdown)
+    grand_total = activities_cost + stay_cost + travel_cost
+
     return {
         "trip_id": trip_id,
         "itinerary": days,
         "day_breakdown": day_breakdown,
-        "total_cost": itinerary.get("total_cost", 0),
+        "total_cost": activities_cost,
         "backup_options": backup_options,
         "accommodation": accommodation,
+        "grand_total": grand_total,
     }
