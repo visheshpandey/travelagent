@@ -1,6 +1,7 @@
 """TravelPilot FastAPI backend — endpoints per build doc section 3."""
 
 import logging
+from datetime import date
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +27,7 @@ from models import (
     UserOut,
     WeatherCheckResponse,
 )
+from prompts.chat_action import classify_and_act
 from prompts.conflicts import check_conflicts
 from prompts.itinerary import generate_itinerary
 from prompts.qna import answer_question
@@ -93,6 +95,22 @@ def _check_conflicts(itinerary: dict, pois: list[dict]) -> list[dict]:
         return []
 
 
+def _finalize_itinerary(
+    trip_id: str,
+    itinerary: dict,
+    pois: list[dict],
+    constraints_updates: dict | None = None,
+) -> tuple[dict, list[dict]]:
+    """Shared enrich -> optimize -> conflict-check -> persist pipeline used by
+    every code path that produces a new itinerary for an existing trip
+    (modify, disrupt, and chat-triggered actions)."""
+    itinerary = enrich_items_with_coords(itinerary, pois)
+    itinerary = optimize_itinerary(itinerary, pois)
+    conflicts = _check_conflicts(itinerary, pois)
+    state.update_trip(trip_id, constraints=constraints_updates, itinerary=itinerary)
+    return itinerary, conflicts
+
+
 @app.get("/pois", response_model=list[PoiSummary])
 def list_pois_endpoint(destination: str):
     """Not in the original API contract; lets the frontend offer a must-visit
@@ -148,11 +166,7 @@ def modify_endpoint(req: ModifyRequest):
     pois = mock_data.get_pois(trip["destination"])
 
     itinerary = generate_itinerary(merged_constraints, pois)
-    itinerary = enrich_items_with_coords(itinerary, pois)
-    itinerary = optimize_itinerary(itinerary, pois)
-    conflicts = _check_conflicts(itinerary, pois)
-
-    state.update_trip(req.trip_id, constraints=updates, itinerary=itinerary)
+    itinerary, conflicts = _finalize_itinerary(req.trip_id, itinerary, pois, constraints_updates=updates)
     return {"trip_id": req.trip_id, **itinerary, "accommodation": trip.get("accommodation"), "conflicts": conflicts}
 
 
@@ -165,12 +179,13 @@ def disrupt_endpoint(req: DisruptRequest):
     pois = mock_data.get_pois(trip["destination"])
     result = replan(trip["itinerary"], req.item_id, req.reason, pois)
     explanation = result.pop("explanation", "")
-    result = enrich_items_with_coords(result, pois)
-    result = optimize_itinerary(result, pois)
-    conflicts = _check_conflicts(result, pois)
-
-    state.update_trip(req.trip_id, itinerary=result)
+    result, conflicts = _finalize_itinerary(req.trip_id, result, pois)
     return {"trip_id": req.trip_id, "days": result["days"], "explanation": explanation, "conflicts": conflicts}
+
+
+def _fallback_answer(trip: dict, pois: list[dict], question: str) -> dict:
+    result = answer_question(trip["itinerary"], pois, question)
+    return {"answer": result.get("answer", ""), "action": "answer"}
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -180,8 +195,70 @@ def ask_endpoint(req: AskRequest):
         raise HTTPException(status_code=404, detail=f"Unknown trip_id: {req.trip_id}")
 
     pois = mock_data.get_pois(trip["destination"])
-    result = answer_question(trip["itinerary"], pois, req.question)
-    return {"answer": result.get("answer", "")}
+
+    try:
+        result = classify_and_act(trip["itinerary"], trip["constraints"], pois, req.question)
+        action = result.get("action")
+
+        if action in ("modify_budget", "modify_dates"):
+            updates: dict = {}
+            budget_total = result.get("budget_total")
+            if isinstance(budget_total, (int, float)) and budget_total > 0:
+                updates["budget_total"] = budget_total
+            start_date = result.get("start_date")
+            end_date = result.get("end_date")
+            if isinstance(start_date, str) and isinstance(end_date, str):
+                try:
+                    date.fromisoformat(start_date)
+                    date.fromisoformat(end_date)
+                    updates["start_date"] = start_date
+                    updates["end_date"] = end_date
+                except ValueError:
+                    pass
+
+            if not updates:
+                return _fallback_answer(trip, pois, req.question)
+
+            merged_constraints = {**trip["constraints"], **updates}
+            itinerary = generate_itinerary(merged_constraints, pois)
+            itinerary, conflicts = _finalize_itinerary(req.trip_id, itinerary, pois, constraints_updates=updates)
+            return {
+                "answer": result.get("message", "Updated your plan."),
+                "action": "modify",
+                "modify_result": {
+                    "trip_id": req.trip_id,
+                    **itinerary,
+                    "accommodation": trip.get("accommodation"),
+                    "conflicts": conflicts,
+                },
+                "updated_constraints": merged_constraints,
+            }
+
+        if action == "disrupt_item":
+            item_id = result.get("item_id")
+            items = [item for day in trip["itinerary"]["days"] for item in day["items"]]
+            if not item_id or not any(item["id"] == item_id for item in items):
+                return _fallback_answer(trip, pois, req.question)
+
+            reason = result.get("reason") or req.question
+            replan_result = replan(trip["itinerary"], item_id, reason, pois)
+            explanation = replan_result.pop("explanation", "")
+            replan_result, conflicts = _finalize_itinerary(req.trip_id, replan_result, pois)
+            return {
+                "answer": result.get("message", explanation),
+                "action": "disrupt",
+                "disrupt_result": {
+                    "trip_id": req.trip_id,
+                    "days": replan_result["days"],
+                    "explanation": explanation,
+                    "conflicts": conflicts,
+                },
+            }
+
+        return {"answer": result.get("message", ""), "action": "answer"}
+    except Exception:
+        logger.exception("Chat action failed, falling back to plain answer")
+        return _fallback_answer(trip, pois, req.question)
 
 
 @app.post("/suggest-alternatives", response_model=SuggestAlternativesResponse)

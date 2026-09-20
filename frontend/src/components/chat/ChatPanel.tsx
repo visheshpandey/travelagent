@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { askQuestion } from "../../lib/api";
-import type { ChatMessage } from "../../lib/types";
+import type { ChatMessage, ConflictItem, DayPlan, ItineraryResponse, TripConstraints } from "../../lib/types";
 
 interface Props {
   tripId: string | null;
+  onModified: (res: ItineraryResponse, used: TripConstraints) => void;
+  onDisrupted: (days: DayPlan[], explanation: string, conflicts?: ConflictItem[]) => void;
 }
 
-export default function ChatPanel({ tripId }: Props) {
+export default function ChatPanel({ tripId, onModified, onDisrupted }: Props) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -23,6 +25,11 @@ export default function ChatPanel({ tripId }: Props) {
     try {
       const res = await askQuestion({ trip_id: tripId, question: q });
       setMessages((prev) => [...prev, { role: "agent", text: res.answer }]);
+      if (res.action === "modify" && res.modify_result && res.updated_constraints) {
+        onModified(res.modify_result, res.updated_constraints);
+      } else if (res.action === "disrupt" && res.disrupt_result) {
+        onDisrupted(res.disrupt_result.days, res.disrupt_result.explanation, res.disrupt_result.conflicts);
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -45,7 +52,7 @@ export default function ChatPanel({ tripId }: Props) {
             className="glass rounded-2xl w-80 sm:w-96 h-[28rem] mb-4 flex flex-col shadow-card overflow-hidden"
           >
             <div className="px-4 py-3 border-b border-subtle flex items-center justify-between">
-              <p className="font-display font-semibold text-sm">Ask about your trip</p>
+              <p className="font-display font-semibold text-sm">Ask or tell your trip assistant</p>
               <button onClick={() => setOpen(false)} className="text-tertiary hover:text-primary text-sm">
                 ✕
               </button>
@@ -75,7 +82,7 @@ export default function ChatPanel({ tripId }: Props) {
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 disabled={!tripId}
-                placeholder="What am I doing tomorrow?"
+                placeholder="Ask, or say 'make it cheaper' or 'I missed the fort visit'"
                 className="flex-1 rounded-full bg-panel border border-subtle px-4 py-2 text-xs focus:border-accent focus:outline-none disabled:opacity-40"
               />
               <button

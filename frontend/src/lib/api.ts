@@ -4,6 +4,7 @@ import type {
   DisruptResponse,
   ItineraryResponse,
   PoiSummary,
+  TripConstraints,
   User,
   WeatherCheckResponse,
 } from "./types";
@@ -73,8 +74,16 @@ export function disruptTrip(payload: { trip_id: string; item_id: string; reason:
   });
 }
 
+export interface AskResponse {
+  answer: string;
+  action: "answer" | "modify" | "disrupt";
+  modify_result?: ItineraryResponse | null;
+  disrupt_result?: DisruptResponse | null;
+  updated_constraints?: TripConstraints | null;
+}
+
 export function askQuestion(payload: { trip_id: string; question: string }) {
-  return request<{ answer: string }>("/ask", {
+  return request<AskResponse>("/ask", {
     method: "POST",
     body: JSON.stringify(payload),
   });

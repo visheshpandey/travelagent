@@ -104,8 +104,20 @@ class DisruptResponse(BaseModel):
     conflicts: list[ConflictItem] = []
 
 
+class TripConstraintsOut(BaseModel):
+    start_date: str
+    end_date: str
+    budget_total: float
+    interests: list[str]
+    must_visit: list[str]
+
+
 class AskResponse(BaseModel):
     answer: str
+    action: str = "answer"
+    modify_result: Optional[ItineraryResponse] = None
+    disrupt_result: Optional[DisruptResponse] = None
+    updated_constraints: Optional[TripConstraintsOut] = None
 
 
 class BackupOption(BaseModel):

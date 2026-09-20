@@ -117,7 +117,7 @@ function App() {
           </div>
         )}
 
-        <ChatPanel tripId={trip?.trip_id ?? null} />
+        <ChatPanel tripId={trip?.trip_id ?? null} onModified={handleModified} onDisrupted={handleDisrupted} />
 
         <footer className="text-center text-xs text-faint py-10">
           TravelPilot — built for a 2-day hackathon.
