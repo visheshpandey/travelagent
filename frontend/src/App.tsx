@@ -74,38 +74,40 @@ function App() {
         {trip ? (
           <>
             <StopTimeline days={trip.days} selectedItemId={selectedItemId} onSelectItem={setSelectedItemId} />
-            <div className="max-w-6xl mx-auto px-6 sm:px-10 -mt-6 mb-6">
-              <ConflictBanner conflicts={trip.conflicts} />
-            </div>
-            <ItineraryBoard
-              destination={destination}
-              days={trip.days}
-              totalCost={trip.total_cost}
-              selectedItemId={selectedItemId}
-              onSelectItem={setSelectedItemId}
-            />
-            {stops.length > 0 && (
-              <div className="max-w-6xl mx-auto px-6 sm:px-10 -mt-10 mb-16">
-                <ItineraryMap stops={stops} travelMode="driving" />
+            <div className="lg:pl-64">
+              <div className="max-w-6xl mx-auto px-6 sm:px-10 -mt-6 mb-6">
+                <ConflictBanner conflicts={trip.conflicts} />
               </div>
-            )}
-            <div className="max-w-6xl mx-auto px-6 sm:px-10 -mt-10 mb-6">
-              <EditConstraintsPanel
-                key={trip.trip_id}
-                tripId={trip.trip_id}
-                constraints={constraints}
-                onModified={handleModified}
+              <ItineraryBoard
+                destination={destination}
+                days={trip.days}
+                totalCost={trip.total_cost}
+                selectedItemId={selectedItemId}
+                onSelectItem={setSelectedItemId}
               />
+              {stops.length > 0 && (
+                <div className="max-w-6xl mx-auto px-6 sm:px-10 -mt-10 mb-16">
+                  <ItineraryMap stops={stops} travelMode="driving" />
+                </div>
+              )}
+              <div className="max-w-6xl mx-auto px-6 sm:px-10 -mt-10 mb-6">
+                <EditConstraintsPanel
+                  key={trip.trip_id}
+                  tripId={trip.trip_id}
+                  constraints={constraints}
+                  onModified={handleModified}
+                />
+              </div>
+              <DisruptPanel
+                tripId={trip.trip_id}
+                days={trip.days}
+                selectedItemId={selectedItemId}
+                explanation={explanation}
+                onSelectItem={setSelectedItemId}
+                onDisrupted={handleDisrupted}
+              />
+              <DashboardSummary tripId={trip.trip_id} refreshKey={refreshKey} />
             </div>
-            <DisruptPanel
-              tripId={trip.trip_id}
-              days={trip.days}
-              selectedItemId={selectedItemId}
-              explanation={explanation}
-              onSelectItem={setSelectedItemId}
-              onDisrupted={handleDisrupted}
-            />
-            <DashboardSummary tripId={trip.trip_id} refreshKey={refreshKey} />
           </>
         ) : (
           <div id="itinerary" className="max-w-3xl mx-auto px-6 py-28 text-center">
