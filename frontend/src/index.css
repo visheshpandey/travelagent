@@ -1,11 +1,29 @@
-@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+
+  --bg-page: #faf6f0;
+  --bg-panel: #ffffff;
+  --glass-from: rgba(255, 255, 255, 0.86);
+  --glass-to: rgba(250, 245, 236, 0.86);
+  --glass-border: rgba(22, 33, 58, 0.08);
+  --text-primary: #16213a;
+  --text-secondary: rgba(22, 33, 58, 0.68);
+  --text-tertiary: rgba(22, 33, 58, 0.52);
+  --text-faint: rgba(22, 33, 58, 0.36);
+  --border-subtle: rgba(22, 33, 58, 0.08);
+  --border-default: rgba(22, 33, 58, 0.15);
+  --surface-hover: rgba(22, 33, 58, 0.04);
+  --scrollbar-track: #faf6f0;
+  --scrollbar-thumb: #e2d8c8;
+  --shadow-card: 0 8px 24px rgba(22, 33, 58, 0.08);
+  --color-accent: #0f9488;
+  --color-on-accent: #ffffff;
 }
 
 html,
@@ -13,12 +31,12 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  background: #05060a;
+  background: var(--bg-page);
 }
 
 body {
   font-family: "Inter", system-ui, sans-serif;
-  color: #e7e9f5;
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -27,21 +45,21 @@ body {
   width: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #05060a;
+  background: var(--scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #1c2033;
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
 
 .glass {
-  background: linear-gradient(180deg, rgba(20, 23, 38, 0.72), rgba(11, 13, 22, 0.72));
-  border: 1px solid rgba(125, 211, 252, 0.14);
+  background: linear-gradient(180deg, var(--glass-from), var(--glass-to));
+  border: 1px solid var(--glass-border);
   backdrop-filter: blur(18px);
 }
 
 .text-gradient {
-  background: linear-gradient(90deg, #7dd3fc, #c4b5fd 60%, #fb923c);
+  background: linear-gradient(90deg, var(--color-accent, #0f9488), #f97316 85%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

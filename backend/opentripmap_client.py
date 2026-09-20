@@ -22,7 +22,7 @@ load_dotenv()
 
 _BASE_URL = "https://api.opentripmap.com/0.1/en/places"
 _RADIUS_M = 25000
-_RESULTS_PER_CATEGORY = 3
+_RESULTS_PER_CATEGORY = 6
 
 DESTINATION_CENTERS = {
     "Jaipur": (26.9124, 75.7873),
@@ -71,6 +71,15 @@ DEFAULT_OPEN_HOURS = {
 SCRIPTED_CLOSED_DATE = "2026-11-10"
 
 _CACHE: dict[str, list[dict]] = {}
+_ACCOMMODATION_CACHE: dict[str, list[dict]] = {}
+
+
+def _accommodation_cost_per_night(rating: float | None) -> float:
+    if rating is not None and rating >= 4:
+        return 4000
+    if rating is not None and rating >= 2:
+        return 2500
+    return 1500
 
 
 def _map_kinds_to_category(kinds: str) -> str:
@@ -152,6 +161,70 @@ def _fetch_destination(destination: str) -> list[dict]:
         pois[0]["closed_on"] = SCRIPTED_CLOSED_DATE
 
     return pois
+
+
+def _fetch_accommodations(destination: str) -> list[dict]:
+    api_key = os.environ.get("OPENTRIPMAP_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENTRIPMAP_API_KEY is not set (see backend/.env.example)")
+
+    lat, lon = DESTINATION_CENTERS[destination]
+    code = DESTINATION_CODES[destination]
+
+    resp = requests.get(
+        f"{_BASE_URL}/radius",
+        params={
+            "radius": _RADIUS_M,
+            "lat": lat,
+            "lon": lon,
+            "kinds": "accomodations",
+            "limit": 10,
+            "apikey": api_key,
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    features = json.loads(resp.content.decode("utf-8")).get("features", [])
+    features.sort(key=lambda f: -f["properties"].get("rate", 0))
+
+    accommodations: list[dict] = []
+    seen_xids: set[str] = set()
+    counter = 1
+    for feature in features[:_RESULTS_PER_CATEGORY]:
+        props = feature["properties"]
+        xid = props.get("xid")
+        name = props.get("name")
+        if not xid or not name or xid in seen_xids:
+            continue
+        seen_xids.add(xid)
+
+        details = _get_details(xid, api_key)
+        point = details.get("point") or {}
+        poi_lat = point.get("lat", feature["geometry"]["coordinates"][1])
+        poi_lng = point.get("lon", feature["geometry"]["coordinates"][0])
+
+        # OpenTripMap's "rate" is a popularity/importance rank, not a star
+        # rating — same reason mock_data/pois never surface a `rating` value
+        # (see PoiSummary), so accommodations don't invent one either.
+        accommodations.append({
+            "id": f"{code}_hotel_{counter:02d}",
+            "name": name,
+            "lat": poi_lat,
+            "lng": poi_lng,
+            "rating": None,
+            "cost_per_night": _accommodation_cost_per_night(None),
+        })
+        counter += 1
+
+    return accommodations
+
+
+def get_accommodations(destination: str) -> list[dict]:
+    if destination not in DESTINATION_CENTERS:
+        return []
+    if destination not in _ACCOMMODATION_CACHE:
+        _ACCOMMODATION_CACHE[destination] = _fetch_accommodations(destination)
+    return _ACCOMMODATION_CACHE[destination]
 
 
 def get_pois(destination: str) -> list[dict]:

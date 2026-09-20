@@ -5,13 +5,21 @@ import uuid
 _trips: dict[str, dict] = {}
 
 
-def new_trip(destination: str, constraints: dict, itinerary: dict) -> str:
+def new_trip(
+    destination: str,
+    constraints: dict,
+    itinerary: dict,
+    accommodation: dict | None = None,
+    user_id: str | None = None,
+) -> str:
     trip_id = f"t_{uuid.uuid4().hex[:8]}"
     _trips[trip_id] = {
         "trip_id": trip_id,
         "destination": destination,
         "constraints": constraints,
         "itinerary": itinerary,
+        "accommodation": accommodation,
+        "user_id": user_id,
     }
     return trip_id
 

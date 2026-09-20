@@ -5,20 +5,45 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
+
+class UserOut(BaseModel):
+    sub: str
+    email: str
+    name: str
+    picture: Optional[str] = None
+
+
+class LoginResponse(BaseModel):
+    session_token: str
+    user: UserOut
+
+
 class GenerateItineraryRequest(BaseModel):
     destination: str
     start_date: str
     end_date: str
     budget_total: float
     interests: list[str] = []
+    must_visit: list[str] = []
 
 
 class ModifyRequest(BaseModel):
     trip_id: str
     budget_total: Optional[float] = None
     interests: Optional[list[str]] = None
+    must_visit: Optional[list[str]] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+
+
+class PoiSummary(BaseModel):
+    id: str
+    name: str
+    category: str
+    rating: Optional[float] = None
 
 
 class DisruptRequest(BaseModel):
@@ -39,6 +64,8 @@ class ItineraryItem(BaseModel):
     end: str
     cost: float
     category: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 
 class DayPlan(BaseModel):
@@ -47,16 +74,34 @@ class DayPlan(BaseModel):
     day_cost: float
 
 
+class Accommodation(BaseModel):
+    id: str
+    name: str
+    lat: float
+    lng: float
+    rating: Optional[float] = None
+    cost_per_night: float
+
+
+class ConflictItem(BaseModel):
+    day: str
+    item_ids: list[str]
+    issue: str
+
+
 class ItineraryResponse(BaseModel):
     trip_id: str
     days: list[DayPlan]
     total_cost: float
+    accommodation: Optional[Accommodation] = None
+    conflicts: list[ConflictItem] = []
 
 
 class DisruptResponse(BaseModel):
     trip_id: str
     days: list[DayPlan]
     explanation: str
+    conflicts: list[ConflictItem] = []
 
 
 class AskResponse(BaseModel):
@@ -68,22 +113,40 @@ class BackupOption(BaseModel):
     category: str
 
 
+class DayBreakdown(BaseModel):
+    date: str
+    accommodation_cost: float
+    travel_cost: float
+    legs: list[dict]
+
+
 class DashboardResponse(BaseModel):
     trip_id: str
     itinerary: list[DayPlan]
-    transportation: list[dict]
+    day_breakdown: list[DayBreakdown]
     total_cost: float
     backup_options: list[BackupOption]
-
-
-class ConflictItem(BaseModel):
-    day: str
-    item_ids: list[str]
-    issue: str
+    accommodation: Optional[Accommodation] = None
 
 
 class ConflictResponse(BaseModel):
     conflicts: list[ConflictItem]
+
+
+class AlternativeSuggestion(BaseModel):
+    id: str
+    name: str
+    category: str
+    rating: Optional[float] = None
+
+
+class SuggestAlternativesRequest(BaseModel):
+    trip_id: str
+    item_id: str
+
+
+class SuggestAlternativesResponse(BaseModel):
+    alternatives: list[AlternativeSuggestion]
 
 
 class AtRiskItem(BaseModel):

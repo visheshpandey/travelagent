@@ -4,24 +4,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#05060a",
-        panel: "#0b0d16",
-        edge: "#1c2033",
-        accent: "#7dd3fc",
+        panel: "var(--bg-panel, #ffffff)",
+        edge: "#e2d8c8",
+        accent: "var(--color-accent, #0f9488)",
+        onaccent: "var(--color-on-accent, #ffffff)",
         accent2: "#c4b5fd",
-        ember: "#fb923c",
+        ember: "#f97316",
+        surface: "var(--bg-page, #faf6f0)",
+        primary: "var(--text-primary, #16213a)",
+        secondary: "var(--text-secondary, rgba(22,33,58,0.68))",
+        tertiary: "var(--text-tertiary, rgba(22,33,58,0.52))",
+        faint: "var(--text-faint, rgba(22,33,58,0.36))",
+        subtle: "var(--border-subtle, rgba(22,33,58,0.08))",
+        outline: "var(--border-default, rgba(22,33,58,0.15))",
+        hoverwash: "var(--surface-hover, rgba(22,33,58,0.04))",
       },
       fontFamily: {
-        display: ["'Sora'", "sans-serif"],
+        display: ["'Fraunces'", "serif"],
         body: ["'Inter'", "sans-serif"],
       },
-      backgroundImage: {
-        "grid-glow":
-          "radial-gradient(circle at 50% 0%, rgba(125,211,252,0.12), transparent 60%)",
-      },
       boxShadow: {
-        glow: "0 0 40px rgba(125,211,252,0.25)",
-        card: "0 8px 32px rgba(0,0,0,0.45)",
+        glow: "0 0 32px rgba(15,148,136,0.25)",
+        card: "var(--shadow-card, 0 8px 24px rgba(22,33,58,0.08))",
       },
     },
   },

@@ -2,6 +2,14 @@ import { useRef } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import type { DayPlan } from "../../lib/types";
 
+// Variant keys match the parent stagger container in ItineraryBoard — no own
+// initial/animate/whileInView here, so this card's entrance is orchestrated
+// by the parent rather than triggering independently.
+const cardVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45 } },
+};
+
 const CATEGORY_COLOR: Record<string, string> = {
   heritage: "#fb923c",
   food: "#facc15",
@@ -42,14 +50,11 @@ export default function DayCard({ day, index, onSelectItem, selectedItemId }: Pr
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.5, delay: index * 0.08 }}
+      variants={cardVariants}
       className="glass rounded-2xl p-6 w-80 shrink-0 shadow-card"
     >
       <div style={{ transform: "translateZ(40px)" }}>
-        <p className="text-xs uppercase tracking-wide text-white/40 mb-1">Day {index + 1}</p>
+        <p className="text-xs uppercase tracking-wide text-tertiary mb-1">Day {index + 1}</p>
         <h3 className="font-display font-semibold text-lg mb-4">{day.date}</h3>
         <div className="space-y-3">
           {day.items.map((item) => (
@@ -59,7 +64,7 @@ export default function DayCard({ day, index, onSelectItem, selectedItemId }: Pr
               className={`w-full text-left rounded-xl px-3 py-2 border transition ${
                 selectedItemId === item.id
                   ? "border-ember bg-ember/10"
-                  : "border-white/10 hover:border-white/25"
+                  : "border-subtle hover:border-outline"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -69,7 +74,7 @@ export default function DayCard({ day, index, onSelectItem, selectedItemId }: Pr
                   style={{ background: CATEGORY_COLOR[item.category] ?? "#7dd3fc" }}
                 />
               </div>
-              <div className="flex items-center justify-between text-xs text-white/45 mt-1">
+              <div className="flex items-center justify-between text-xs text-tertiary mt-1">
                 <span>
                   {item.start}–{item.end}
                 </span>
@@ -78,8 +83,8 @@ export default function DayCard({ day, index, onSelectItem, selectedItemId }: Pr
             </button>
           ))}
         </div>
-        <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-sm">
-          <span className="text-white/50">Day total</span>
+        <div className="mt-4 pt-4 border-t border-subtle flex items-center justify-between text-sm">
+          <span className="text-tertiary">Day total</span>
           <span className="font-semibold text-accent">₹{day.day_cost.toLocaleString("en-IN")}</span>
         </div>
       </div>

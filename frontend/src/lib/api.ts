@@ -1,10 +1,30 @@
-import type { DashboardResponse, DisruptResponse, ItineraryResponse, WeatherCheckResponse } from "./types";
+import type {
+  AlternativeSuggestion,
+  DashboardResponse,
+  DisruptResponse,
+  ItineraryResponse,
+  PoiSummary,
+  User,
+  WeatherCheckResponse,
+} from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
+// Set by AuthProvider on login/logout/hydration — kept as a module-level
+// variable rather than threaded through every call site or read from React
+// context here, since this file has no React dependency otherwise.
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...init,
   });
   if (!res.ok) {
@@ -14,12 +34,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export function getPois(destination: string) {
+  return request<PoiSummary[]>(`/pois?destination=${encodeURIComponent(destination)}`);
+}
+
 export function generateItinerary(payload: {
   destination: string;
   start_date: string;
   end_date: string;
   budget_total: number;
   interests: string[];
+  must_visit: string[];
 }) {
   return request<ItineraryResponse>("/generate-itinerary", {
     method: "POST",
@@ -31,6 +56,7 @@ export function modifyTrip(payload: {
   trip_id: string;
   budget_total?: number;
   interests?: string[];
+  must_visit?: string[];
   start_date?: string;
   end_date?: string;
 }) {
@@ -60,4 +86,22 @@ export function getDashboard(tripId: string) {
 
 export function checkWeather(tripId: string) {
   return request<WeatherCheckResponse>(`/weather-check?trip_id=${encodeURIComponent(tripId)}`);
+}
+
+export function suggestAlternatives(payload: { trip_id: string; item_id: string }) {
+  return request<{ alternatives: AlternativeSuggestion[] }>("/suggest-alternatives", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function googleLogin(idToken: string) {
+  return request<{ session_token: string; user: User }>("/auth/google-login", {
+    method: "POST",
+    body: JSON.stringify({ id_token: idToken }),
+  });
+}
+
+export function getMe() {
+  return request<User>("/auth/me");
 }

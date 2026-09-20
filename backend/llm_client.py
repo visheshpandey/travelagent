@@ -45,6 +45,10 @@ def _call(system_prompt: str, payload: dict, *, retries: int = 2) -> str:
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     response_mime_type="application/json",
+                    # Long, dense itineraries (many days x several stops/day)
+                    # produce large JSON payloads — the default cap risks
+                    # silent truncation on longer trips.
+                    max_output_tokens=16384,
                 ),
             )
             return response.text
