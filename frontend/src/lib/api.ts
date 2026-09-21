@@ -40,7 +40,8 @@ export function getPois(destination: string) {
 }
 
 export function generateItinerary(payload: {
-  destination: string;
+  destinations: string[];
+  travel_gap?: boolean;
   start_date: string;
   end_date: string;
   budget_total: number;
@@ -60,6 +61,8 @@ export function modifyTrip(payload: {
   must_visit?: string[];
   start_date?: string;
   end_date?: string;
+  destinations?: string[];
+  travel_gap?: boolean;
 }) {
   return request<ItineraryResponse>("/modify", {
     method: "POST",

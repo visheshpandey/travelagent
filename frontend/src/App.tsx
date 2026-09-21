@@ -20,14 +20,15 @@ import type { ItineraryResponse, TripConstraints } from "./lib/types";
 
 function App() {
   const [trip, setTrip] = useState<ItineraryResponse | null>(null);
-  const [destination, setDestination] = useState(DESTINATIONS[0].name);
+  const [destinations, setDestinations] = useState<string[]>([DESTINATIONS[0].name]);
   const [constraints, setConstraints] = useState<TripConstraints | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [disrupted, setDisrupted] = useState(false);
 
-  const heroSeed = useMemo(() => hashCity(destination), [destination]);
+  const heroSeed = useMemo(() => hashCity(destinations.join("|")), [destinations]);
+  const heroLabel = useMemo(() => destinations.join(" → "), [destinations]);
 
   const stops = useMemo(
     () =>
@@ -40,9 +41,9 @@ function App() {
     [trip],
   );
 
-  function handleGenerated(res: ItineraryResponse, dest: string, usedConstraints: TripConstraints) {
+  function handleGenerated(res: ItineraryResponse, dests: string[], usedConstraints: TripConstraints) {
     setTrip(res);
-    setDestination(dest);
+    setDestinations(dests);
     setConstraints(usedConstraints);
     setSelectedItemId(res.days[0]?.items[0]?.id ?? null);
     setExplanation(null);
@@ -72,8 +73,8 @@ function App() {
       <div className="relative min-h-screen">
         <Navbar />
         <main>
-        <Hero cityName={destination} seed={heroSeed} disrupted={disrupted} />
-        <ConstraintForm destination={destination} onDestinationChange={setDestination} onGenerated={handleGenerated} />
+        <Hero cityName={heroLabel} seed={heroSeed} disrupted={disrupted} />
+        <ConstraintForm destinations={destinations} onDestinationsChange={setDestinations} onGenerated={handleGenerated} />
 
         {trip ? (
           <>
@@ -83,7 +84,7 @@ function App() {
                 <ConflictBanner conflicts={trip.conflicts} />
               </div>
               <ItineraryBoard
-                destination={destination}
+                destinations={trip.destinations ?? destinations}
                 days={trip.days}
                 totalCost={trip.total_cost}
                 selectedItemId={selectedItemId}

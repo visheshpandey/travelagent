@@ -29,7 +29,7 @@ from models import (
 )
 from prompts.chat_action import classify_and_act
 from prompts.conflicts import check_conflicts
-from prompts.itinerary import generate_itinerary
+from prompts.itinerary import _trip_dates, generate_itinerary
 from prompts.qna import answer_question
 from prompts.replanner import replan
 from route_optimizer import optimize_itinerary
@@ -111,6 +111,117 @@ def _finalize_itinerary(
     return itinerary, conflicts
 
 
+def _union_pois(destinations: list[str]) -> list[dict]:
+    """POI ids are already namespaced per city (jp_01, ud_03, ...), so this
+    concatenation is safe to use wherever a trip's full POI context is
+    needed regardless of how many destinations it spans."""
+    return [p for d in destinations for p in mock_data.get_pois(d)]
+
+
+def _carry_day_tags(old_days: list[dict], new_days: list[dict]) -> list[dict]:
+    """replan()'s LLM output rebuilds `days` from scratch and never carries
+    over `destination`/`is_travel_day` (it doesn't know those concepts) —
+    without this, any disruption on a multi-city trip would silently wipe
+    every day's city label and break per-day accommodation matching on the
+    dashboard. Days are matched by date, which replan never adds/removes."""
+    tags_by_date = {d["date"]: (d.get("destination"), d.get("is_travel_day", False)) for d in old_days}
+    for day in new_days:
+        destination, is_travel_day = tags_by_date.get(day["date"], (None, False))
+        day["destination"] = destination
+        day["is_travel_day"] = is_travel_day
+    return new_days
+
+
+def _split_days(trip_dates: list[str], destinations: list[str], gap: bool) -> list[tuple[str | None, list[str]]]:
+    """Splits a trip's calendar dates into per-destination legs, in order.
+    Returns a list of (destination, dates) pairs; a `None` destination marks
+    a travel/gap day between two legs (no LLM call, no items). Falls back to
+    skipping gap insertion (rather than starving a leg of all its days) when
+    the trip is too short to fit both the requested cities and the gaps."""
+    k = len(destinations)
+    if k == 1:
+        return [(destinations[0], trip_dates)]
+
+    n = len(trip_dates)
+    use_gap = gap and n >= 2 * k - 1
+    gap_count = k - 1 if use_gap else 0
+    activity_days = n - gap_count
+    base, extra = divmod(activity_days, k)
+
+    legs: list[tuple[str | None, list[str]]] = []
+    idx = 0
+    for i, dest in enumerate(destinations):
+        count = max(base + (1 if i < extra else 0), 1)
+        leg_dates = trip_dates[idx : idx + count]
+        idx += count
+        legs.append((dest, leg_dates))
+        if use_gap and i < k - 1 and idx < n:
+            legs.append((None, [trip_dates[idx]]))
+            idx += 1
+    return legs
+
+
+def _build_itinerary(destinations: list[str], constraints: dict, travel_gap: bool) -> tuple[dict, list[dict]]:
+    """Builds a (possibly multi-city) itinerary: one generate_itinerary call
+    per real leg (narrow date range + that city's own POIs only, so the LLM
+    never has to reason about two cities at once), gap-day placeholders
+    between legs when requested, and one accommodation pick per leg. This is
+    the single place multi-leg logic lives — reused by /generate-itinerary,
+    /modify, and the chat-action modify path."""
+    trip_dates = _trip_dates(constraints["start_date"], constraints["end_date"])
+    legs = _split_days(trip_dates, destinations, travel_gap)
+    # Only tag days with a destination/is_travel_day when there's more than
+    # one city — keeps single-destination trips' JSON identical to before
+    # this feature existed, so the frontend can treat "day.destination is
+    # set" as "this is a multi-city trip" without a separate flag.
+    multi = len(destinations) > 1
+
+    all_days: list[dict] = []
+    total_cost = 0.0
+    accommodations: list[dict] = []
+
+    for leg_dest, leg_dates in legs:
+        if leg_dest is None:
+            for d in leg_dates:
+                all_days.append({
+                    "date": d,
+                    "items": [],
+                    "day_cost": 0,
+                    "destination": None,
+                    "is_travel_day": True,
+                })
+            continue
+
+        leg_pois = mock_data.get_pois(leg_dest)
+        leg_poi_ids = {p["id"] for p in leg_pois}
+        leg_constraints = {
+            **constraints,
+            "start_date": leg_dates[0],
+            "end_date": leg_dates[-1],
+            "must_visit": [m for m in constraints.get("must_visit", []) if m in leg_poi_ids],
+            "budget_total": constraints["budget_total"] * len(leg_dates) / max(len(trip_dates), 1),
+        }
+        leg_itinerary = generate_itinerary(leg_constraints, leg_pois)
+        # pick_accommodation needs item coordinates, which the LLM output
+        # never carries (only POI ids) — enrich this leg locally before
+        # picking a stay. The endpoint re-enriches the full stitched
+        # itinerary afterwards anyway, so this is just redundant, not wrong.
+        leg_itinerary = enrich_items_with_coords(leg_itinerary, leg_pois)
+        if multi:
+            for day in leg_itinerary.get("days", []):
+                day["destination"] = leg_dest
+                day["is_travel_day"] = False
+        all_days.extend(leg_itinerary.get("days", []))
+        total_cost += leg_itinerary.get("total_cost", 0)
+
+        leg_items = [item for day in leg_itinerary.get("days", []) for item in day["items"]]
+        accommodation = pick_accommodation(leg_items, mock_data.get_accommodations(leg_dest))
+        if accommodation:
+            accommodations.append({**accommodation, "destination": leg_dest})
+
+    return {"days": all_days, "total_cost": total_cost}, accommodations
+
+
 @app.get("/pois", response_model=list[PoiSummary])
 def list_pois_endpoint(destination: str):
     """Not in the original API contract; lets the frontend offer a must-visit
@@ -129,30 +240,44 @@ def list_pois_endpoint(destination: str):
 
 @app.post("/generate-itinerary", response_model=ItineraryResponse)
 def generate_itinerary_endpoint(req: GenerateItineraryRequest, user: dict | None = Depends(_get_optional_user)):
-    pois = mock_data.get_pois(req.destination)
-    if not pois:
+    destinations = req.destinations
+    if not destinations or len(destinations) > 3:
+        raise HTTPException(status_code=400, detail="Pick between 1 and 3 destinations.")
+    if len(set(destinations)) != len(destinations):
+        raise HTTPException(status_code=400, detail="Duplicate destinations aren't allowed.")
+    unknown = [d for d in destinations if d not in mock_data.DESTINATION_CENTERS]
+    if unknown:
         raise HTTPException(
             status_code=404,
-            detail=f"No POI data for destination '{req.destination}'. Available: {mock_data.list_destinations()}",
+            detail=f"No POI data for destination(s) {unknown}. Available: {mock_data.list_destinations()}",
         )
+    trip_dates = _trip_dates(req.start_date, req.end_date)
+    if len(trip_dates) < len(destinations):
+        raise HTTPException(status_code=400, detail="Trip is shorter than the number of destinations picked.")
 
     constraints = req.model_dump()
-    itinerary = generate_itinerary(constraints, pois)
+    itinerary, accommodations = _build_itinerary(destinations, constraints, req.travel_gap)
+    pois = _union_pois(destinations)
     itinerary = enrich_items_with_coords(itinerary, pois)
     itinerary = optimize_itinerary(itinerary, pois)
     conflicts = _check_conflicts(itinerary, pois)
 
-    all_items = [item for day in itinerary["days"] for item in day["items"]]
-    accommodation = pick_accommodation(all_items, mock_data.get_accommodations(req.destination))
-
     trip_id = state.new_trip(
-        req.destination,
+        destinations,
         constraints,
         itinerary,
-        accommodation=accommodation,
+        accommodations=accommodations,
+        travel_gap=req.travel_gap,
         user_id=user["sub"] if user else None,
     )
-    return {"trip_id": trip_id, **itinerary, "accommodation": accommodation, "conflicts": conflicts}
+    return {
+        "trip_id": trip_id,
+        **itinerary,
+        "accommodation": accommodations[0] if accommodations else None,
+        "accommodations": accommodations,
+        "destinations": destinations,
+        "conflicts": conflicts,
+    }
 
 
 @app.post("/modify", response_model=ItineraryResponse)
@@ -161,13 +286,23 @@ def modify_endpoint(req: ModifyRequest):
     if trip is None:
         raise HTTPException(status_code=404, detail=f"Unknown trip_id: {req.trip_id}")
 
-    updates = req.model_dump(exclude={"trip_id"}, exclude_none=True)
+    updates = req.model_dump(exclude={"trip_id", "destinations", "travel_gap"}, exclude_none=True)
     merged_constraints = {**trip["constraints"], **updates}
-    pois = mock_data.get_pois(trip["destination"])
+    destinations = req.destinations or trip["destinations"]
+    travel_gap = req.travel_gap if req.travel_gap is not None else trip.get("travel_gap", False)
 
-    itinerary = generate_itinerary(merged_constraints, pois)
+    itinerary, accommodations = _build_itinerary(destinations, merged_constraints, travel_gap)
+    pois = _union_pois(destinations)
     itinerary, conflicts = _finalize_itinerary(req.trip_id, itinerary, pois, constraints_updates=updates)
-    return {"trip_id": req.trip_id, **itinerary, "accommodation": trip.get("accommodation"), "conflicts": conflicts}
+    state.update_trip(req.trip_id, destinations=destinations, accommodations=accommodations)
+    return {
+        "trip_id": req.trip_id,
+        **itinerary,
+        "accommodation": accommodations[0] if accommodations else None,
+        "accommodations": accommodations,
+        "destinations": destinations,
+        "conflicts": conflicts,
+    }
 
 
 @app.post("/disrupt", response_model=DisruptResponse)
@@ -176,9 +311,10 @@ def disrupt_endpoint(req: DisruptRequest):
     if trip is None:
         raise HTTPException(status_code=404, detail=f"Unknown trip_id: {req.trip_id}")
 
-    pois = mock_data.get_pois(trip["destination"])
+    pois = _union_pois(trip["destinations"])
     result = replan(trip["itinerary"], req.item_id, req.reason, pois)
     explanation = result.pop("explanation", "")
+    result["days"] = _carry_day_tags(trip["itinerary"]["days"], result.get("days", []))
     result, conflicts = _finalize_itinerary(req.trip_id, result, pois)
     return {"trip_id": req.trip_id, "days": result["days"], "explanation": explanation, "conflicts": conflicts}
 
@@ -194,7 +330,7 @@ def ask_endpoint(req: AskRequest):
     if trip is None:
         raise HTTPException(status_code=404, detail=f"Unknown trip_id: {req.trip_id}")
 
-    pois = mock_data.get_pois(trip["destination"])
+    pois = _union_pois(trip["destinations"])
 
     try:
         result = classify_and_act(trip["itinerary"], trip["constraints"], pois, req.question)
@@ -220,15 +356,20 @@ def ask_endpoint(req: AskRequest):
                 return _fallback_answer(trip, pois, req.question)
 
             merged_constraints = {**trip["constraints"], **updates}
-            itinerary = generate_itinerary(merged_constraints, pois)
+            destinations = trip["destinations"]
+            travel_gap = trip.get("travel_gap", False)
+            itinerary, accommodations = _build_itinerary(destinations, merged_constraints, travel_gap)
             itinerary, conflicts = _finalize_itinerary(req.trip_id, itinerary, pois, constraints_updates=updates)
+            state.update_trip(req.trip_id, accommodations=accommodations)
             return {
                 "answer": result.get("message", "Updated your plan."),
                 "action": "modify",
                 "modify_result": {
                     "trip_id": req.trip_id,
                     **itinerary,
-                    "accommodation": trip.get("accommodation"),
+                    "accommodation": accommodations[0] if accommodations else None,
+                    "accommodations": accommodations,
+                    "destinations": destinations,
                     "conflicts": conflicts,
                 },
                 "updated_constraints": merged_constraints,
@@ -243,6 +384,7 @@ def ask_endpoint(req: AskRequest):
             reason = result.get("reason") or req.question
             replan_result = replan(trip["itinerary"], item_id, reason, pois)
             explanation = replan_result.pop("explanation", "")
+            replan_result["days"] = _carry_day_tags(trip["itinerary"]["days"], replan_result.get("days", []))
             replan_result, conflicts = _finalize_itinerary(req.trip_id, replan_result, pois)
             return {
                 "answer": result.get("message", explanation),
@@ -276,7 +418,7 @@ def suggest_alternatives_endpoint(req: SuggestAlternativesRequest):
         raise HTTPException(status_code=404, detail=f"Unknown item_id: {req.item_id}")
 
     used_ids = {item["id"] for item in items}
-    pois = mock_data.get_pois(trip["destination"])
+    pois = _union_pois(trip["destinations"])
     candidates = [
         p for p in pois if p["category"] == target["category"] and p["id"] not in used_ids
     ]
@@ -297,7 +439,7 @@ def check_conflicts_endpoint(trip_id: str):
     if trip is None:
         raise HTTPException(status_code=404, detail=f"Unknown trip_id: {trip_id}")
 
-    pois = mock_data.get_pois(trip["destination"])
+    pois = _union_pois(trip["destinations"])
     return check_conflicts(trip["itinerary"], pois)
 
 
@@ -310,7 +452,10 @@ def weather_check_endpoint(trip_id: str):
     if trip is None:
         raise HTTPException(status_code=404, detail=f"Unknown trip_id: {trip_id}")
 
-    weather = get_current_weather(trip["destination"])
+    # Multi-city trips only check weather for the first leg — a per-city
+    # weather check is out of scope for this pass.
+    primary_destination = trip["destinations"][0]
+    weather = get_current_weather(primary_destination)
 
     at_risk_items = []
     if weather["is_severe"]:
@@ -325,7 +470,7 @@ def weather_check_endpoint(trip_id: str):
                     })
 
     return {
-        "destination": trip["destination"],
+        "destination": primary_destination,
         "condition": weather["main"],
         "description": weather["description"],
         "temp_c": weather["temp_c"],
@@ -340,16 +485,21 @@ def dashboard_endpoint(trip_id: str):
     if trip is None:
         raise HTTPException(status_code=404, detail=f"Unknown trip_id: {trip_id}")
 
-    pois = mock_data.get_pois(trip["destination"])
+    destinations = trip["destinations"]
+    pois = _union_pois(destinations)
     itinerary = trip["itinerary"]
     days = itinerary.get("days", [])
-    accommodation = trip.get("accommodation")
+    accommodations = trip.get("accommodations") or []
+    acc_by_destination = {a["destination"]: a for a in accommodations if a.get("destination")}
+    default_accommodation = accommodations[0] if len(accommodations) == 1 else None
 
     day_breakdown = []
     used_names = set()
     for day in days:
         items = day.get("items", [])
         legs: list[dict] = []
+        day_destination = day.get("destination")
+        accommodation = acc_by_destination.get(day_destination) if day_destination else default_accommodation
 
         def add_leg(name_a, lat_a, lng_a, name_b, lat_b, lng_b):
             if lat_a is None or lng_a is None or lat_b is None or lng_b is None:
@@ -379,6 +529,7 @@ def dashboard_endpoint(trip_id: str):
             "accommodation_cost": accommodation["cost_per_night"] if accommodation else 0,
             "travel_cost": sum(leg["estimated_cost"] for leg in legs),
             "legs": legs,
+            "destination": day_destination,
         })
         used_names.update(item["poi"] for item in items)
 
@@ -400,6 +551,8 @@ def dashboard_endpoint(trip_id: str):
         "day_breakdown": day_breakdown,
         "total_cost": activities_cost,
         "backup_options": backup_options,
-        "accommodation": accommodation,
+        "accommodation": accommodations[0] if accommodations else None,
+        "accommodations": accommodations,
+        "destinations": destinations,
         "grand_total": grand_total,
     }

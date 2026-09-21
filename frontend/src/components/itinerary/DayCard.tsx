@@ -67,8 +67,21 @@ export default function DayCard({ day, index, onSelectItem, selectedItemId }: Pr
       className="glass rounded-2xl p-6 w-80 shrink-0 shadow-card"
     >
       <div style={{ transform: "translateZ(40px)" }}>
-        <p className="text-xs uppercase tracking-wide text-tertiary mb-1">Day {index + 1}</p>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs uppercase tracking-wide text-tertiary">Day {index + 1}</p>
+          {day.destination && (
+            <span className="text-[10px] uppercase tracking-wide text-accent2 font-semibold px-2 py-0.5 rounded-full bg-accent2/15">
+              {day.destination}
+            </span>
+          )}
+        </div>
         <h3 className="font-display font-semibold text-lg mb-4">{day.date}</h3>
+        {day.is_travel_day ? (
+          <div className="rounded-xl border border-dashed border-subtle px-3 py-6 text-center">
+            <p className="text-sm text-secondary font-medium mb-1">Travel day</p>
+            <p className="text-xs text-tertiary">No activities scheduled — time to move between cities.</p>
+          </div>
+        ) : (
         <div className="space-y-3">
           {day.items.map((item) => (
             <div key={item.id} className="relative">
@@ -117,6 +130,7 @@ export default function DayCard({ day, index, onSelectItem, selectedItemId }: Pr
             </div>
           ))}
         </div>
+        )}
         <div className="mt-4 pt-4 border-t border-subtle flex items-center justify-between text-sm">
           <span className="text-tertiary">Day total</span>
           <span className="font-semibold text-accent">₹{day.day_cost.toLocaleString("en-IN")}</span>

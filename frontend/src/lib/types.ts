@@ -13,6 +13,8 @@ export interface DayPlan {
   date: string;
   items: ItineraryItem[];
   day_cost: number;
+  destination?: string | null;
+  is_travel_day?: boolean;
 }
 
 export interface Accommodation {
@@ -22,6 +24,7 @@ export interface Accommodation {
   lng: number;
   rating: number | null;
   cost_per_night: number;
+  destination?: string | null;
 }
 
 export interface ConflictItem {
@@ -36,6 +39,8 @@ export interface ItineraryResponse {
   total_cost: number;
   accommodation?: Accommodation | null;
   conflicts?: ConflictItem[];
+  destinations?: string[];
+  accommodations?: Accommodation[];
 }
 
 export interface DisruptResponse {
@@ -72,6 +77,7 @@ export interface DayBreakdown {
   accommodation_cost: number;
   travel_cost: number;
   legs: TransportLeg[];
+  destination?: string | null;
 }
 
 export interface BackupOption {
@@ -87,6 +93,8 @@ export interface DashboardResponse {
   backup_options: BackupOption[];
   accommodation?: Accommodation | null;
   grand_total: number;
+  destinations?: string[];
+  accommodations?: Accommodation[];
 }
 
 export interface ChatMessage {

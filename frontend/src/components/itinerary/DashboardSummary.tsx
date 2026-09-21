@@ -47,7 +47,15 @@ export default function DashboardSummary({ tripId, refreshKey }: Props) {
             }))}
           />
 
-          <AccommodationCard accommodation={data.accommodation} />
+          {data.accommodations && data.accommodations.length > 1 ? (
+            <div className="grid sm:grid-cols-2 gap-4 mb-6">
+              {data.accommodations.map((acc) => (
+                <AccommodationCard key={acc.id} accommodation={acc} />
+              ))}
+            </div>
+          ) : (
+            <AccommodationCard accommodation={data.accommodation} />
+          )}
 
           <div className="space-y-6 mb-6">
             {data.day_breakdown.map((day, i) => (

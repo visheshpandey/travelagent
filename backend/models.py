@@ -22,12 +22,13 @@ class LoginResponse(BaseModel):
 
 
 class GenerateItineraryRequest(BaseModel):
-    destination: str
+    destinations: list[str]
     start_date: str
     end_date: str
     budget_total: float
     interests: list[str] = []
     must_visit: list[str] = []
+    travel_gap: bool = False
 
 
 class ModifyRequest(BaseModel):
@@ -37,6 +38,8 @@ class ModifyRequest(BaseModel):
     must_visit: Optional[list[str]] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    destinations: Optional[list[str]] = None
+    travel_gap: Optional[bool] = None
 
 
 class PoiSummary(BaseModel):
@@ -72,6 +75,8 @@ class DayPlan(BaseModel):
     date: str
     items: list[ItineraryItem]
     day_cost: float
+    destination: Optional[str] = None
+    is_travel_day: bool = False
 
 
 class Accommodation(BaseModel):
@@ -81,6 +86,7 @@ class Accommodation(BaseModel):
     lng: float
     rating: Optional[float] = None
     cost_per_night: float
+    destination: Optional[str] = None
 
 
 class ConflictItem(BaseModel):
@@ -95,6 +101,8 @@ class ItineraryResponse(BaseModel):
     total_cost: float
     accommodation: Optional[Accommodation] = None
     conflicts: list[ConflictItem] = []
+    destinations: Optional[list[str]] = None
+    accommodations: Optional[list[Accommodation]] = None
 
 
 class DisruptResponse(BaseModel):
@@ -130,6 +138,7 @@ class DayBreakdown(BaseModel):
     accommodation_cost: float
     travel_cost: float
     legs: list[dict]
+    destination: Optional[str] = None
 
 
 class DashboardResponse(BaseModel):
@@ -140,6 +149,8 @@ class DashboardResponse(BaseModel):
     backup_options: list[BackupOption]
     accommodation: Optional[Accommodation] = None
     grand_total: float
+    destinations: Optional[list[str]] = None
+    accommodations: Optional[list[Accommodation]] = None
 
 
 class ConflictResponse(BaseModel):

@@ -3,7 +3,7 @@ import DayCard from "./DayCard";
 import type { DayPlan } from "../../lib/types";
 
 interface Props {
-  destination: string;
+  destinations: string[];
   days: DayPlan[];
   totalCost: number;
   selectedItemId: string | null;
@@ -22,13 +22,13 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 };
 
-export default function ItineraryBoard({ destination, days, totalCost, selectedItemId, onSelectItem }: Props) {
+export default function ItineraryBoard({ destinations, days, totalCost, selectedItemId, onSelectItem }: Props) {
   return (
     <section id="itinerary" className="relative py-28 px-6 sm:px-10">
       <motion.div className="max-w-6xl mx-auto" initial="hidden" animate="visible" variants={containerVariants}>
         <motion.div variants={itemVariants} className="flex flex-wrap items-end justify-between gap-4 mb-10">
           <div>
-            <p className="text-sm text-accent/80 font-medium mb-2">{destination} itinerary</p>
+            <p className="text-sm text-accent/80 font-medium mb-2">{destinations.join(" → ")} itinerary</p>
             <h2 className="font-display text-2xl sm:text-3xl font-semibold">
               {days.length} day{days.length === 1 ? "" : "s"}, planned by the agent
             </h2>
