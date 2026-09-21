@@ -10,6 +10,9 @@ import DisruptPanel from "./components/itinerary/DisruptPanel";
 import DashboardSummary from "./components/itinerary/DashboardSummary";
 import StopTimeline from "./components/itinerary/StopTimeline";
 import ChatPanel from "./components/chat/ChatPanel";
+import FAQSection from "./components/layout/FAQSection";
+import AboutSection from "./components/layout/AboutSection";
+import ContactSection from "./components/layout/ContactSection";
 import { AuthProvider } from "./lib/auth";
 import { DESTINATIONS } from "./lib/destinations";
 import { hashCity } from "./lib/hash";
@@ -68,6 +71,7 @@ function App() {
     <AuthProvider>
       <div className="relative min-h-screen">
         <Navbar />
+        <main>
         <Hero cityName={destination} seed={heroSeed} disrupted={disrupted} />
         <ConstraintForm destination={destination} onDestinationChange={setDestination} onGenerated={handleGenerated} />
 
@@ -112,12 +116,19 @@ function App() {
         ) : (
           <div id="itinerary" className="max-w-3xl mx-auto px-6 py-28 text-center">
             <p className="text-tertiary text-sm">
-              Generate an itinerary above to see it laid out here, trigger a live disruption, and view the
-              dashboard.
+              <a href="#plan" className="text-accent hover:underline">
+                Generate an itinerary above
+              </a>{" "}
+              to see it laid out here, trigger a live disruption, and view the dashboard.
             </p>
             <div id="dashboard" />
           </div>
         )}
+
+        <FAQSection />
+        <AboutSection />
+        <ContactSection />
+        </main>
 
         <ChatPanel tripId={trip?.trip_id ?? null} onModified={handleModified} onDisrupted={handleDisrupted} />
 

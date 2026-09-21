@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://frontend-one-xi-29.vercel.app/sitemap.xml
