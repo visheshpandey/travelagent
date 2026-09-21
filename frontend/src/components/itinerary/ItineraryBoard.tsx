@@ -1,8 +1,5 @@
-import { useMemo } from "react";
 import { motion } from "framer-motion";
 import DayCard from "./DayCard";
-import TerrainBanner from "../scene/TerrainBanner";
-import { hashCity } from "../../lib/hash";
 import type { DayPlan } from "../../lib/types";
 
 interface Props {
@@ -26,8 +23,6 @@ const itemVariants = {
 };
 
 export default function ItineraryBoard({ destination, days, totalCost, selectedItemId, onSelectItem }: Props) {
-  const seed = useMemo(() => hashCity(destination), [destination]);
-
   return (
     <section id="itinerary" className="relative py-28 px-6 sm:px-10">
       <motion.div className="max-w-6xl mx-auto" initial="hidden" animate="visible" variants={containerVariants}>
@@ -44,10 +39,6 @@ export default function ItineraryBoard({ destination, days, totalCost, selectedI
               ₹{totalCost.toLocaleString("en-IN")}
             </p>
           </div>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <TerrainBanner seed={seed} segments={days.map((d) => ({ label: d.date, value: d.day_cost }))} />
         </motion.div>
 
         <motion.p variants={itemVariants} className="text-xs text-tertiary mb-4">
